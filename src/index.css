@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0d1117; /* Un negro ligeramente azulado, muy oscuro */
+}
+
+/* --- INICIO DE ESTILOS MEJORADOS PARA FULLCALENDAR --- */
+
+/* Estilo general del contenedor del calendario */
+.fc {
+  border: none !important; /* Elimina cualquier borde exterior */
+}
+
+/* Botones de navegación (prev, next) y título */
+.fc .fc-button-primary {
+  background-color: #374151 !important; /* bg-gray-700 */
+  border: 1px solid #4b5563 !important; /* border-gray-600 */
+  color: #d1d5db !important; /* text-gray-300 */
+  transition: background-color 0.2s;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #4b5563 !important; /* bg-gray-600 */
+}
+
+.fc .fc-toolbar-title {
+  color: #ffffff !important; /* text-white */
+  font-size: 1.125rem !important; /* text-lg */
+  font-weight: 600 !important; /* font-semibold */
+}
+
+/* Encabezados de los días de la semana (lun, mar, mié...) */
+.fc .fc-col-header-cell-cushion {
+  color: #9ca3af; /* text-gray-400 */
+  text-decoration: none !important;
+  font-weight: 600;
+  font-size: 0.875rem; /* text-sm */
+}
+
+/* Números de los días del mes */
+.fc .fc-daygrid-day-number {
+  color: #d1d5db; /* text-gray-300 */
+  text-decoration: none !important;
+}
+
+/* Estilo para el día actual */
+.fc .fc-day-today {
+  background: rgba(139, 92, 246, 0.1) !important; /* Fondo púrpura muy sutil */
+  border: none !important;
+}
+
+/* Elimina los bordes internos de la tabla para un look más limpio */
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard th,
+.fc-theme-standard td {
+  border: none !important;
+}
+
+/* Estilo de los eventos */
+.fc-event {
+  background-color: rgba(139, 92, 246, 0.3) !important; /* Púrpura semitransparente */
+  border: 1px solid rgba(139, 92, 246, 0.8) !important;
+  color: #e5e7eb !important; /* text-gray-200 */
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
