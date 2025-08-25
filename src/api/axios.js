@@ -1,75 +1,54 @@
-// src/lib/apiClient.ts (o donde lo tengas)
-import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+// src/api/axios.js
+import axios from 'axios';
 
-/**
- * Determina el origen base de la API:
- * - Usa VITE_API_URL si existe (Amplify/entornos).
- * - Si no, cae al origin del navegador (útil cuando el frontend y backend comparten dominio).
- * - Último fallback: http://localhost:8006 (dev local).
- */
-const RAW_API_ORIGIN =
-  import.meta.env?.VITE_API_URL?.trim() ||
+// 1) Origen base (Vite -> VITE_API_URL; fallback origin; luego localhost)
+const rawApiOrigin =
+  (import.meta && import.meta.env && import.meta.env.VITE_API_URL) ||
   (typeof window !== 'undefined' ? window.location.origin : '') ||
-  'http://localhost:8006';
+  'https://api-nd.n100f.com';
 
-/** Normaliza y asegura el sufijo /api/v1 */
-const normalize = (s: string) => s.replace(/\/+$/, '');
-const BASE_URL = `${normalize(RAW_API_ORIGIN)}/api/v1`;
+// 2) Normaliza y asegura sufijo /api/v1
+const normalize = (s) => (s ? s.replace(/\/+$/, '') : '');
+const BASE_URL = `${normalize(rawApiOrigin)}/api/v1`;
 
+// 3) Cliente axios
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 20000, // 20s por si hay cold starts
+  timeout: 20000,
   withCredentials: false,
 });
 
-/** Adjunta Authorization si hay token en localStorage */
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (token) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`,
-    };
-  }
-  // Traceo opcional por request
-  (config.headers as Record<string, string>)['X-Requested-With'] = 'XMLHttpRequest';
+// 4) Interceptor de request: añade token si existe
+apiClient.interceptors.request.use((config) => {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` };
+    }
+    config.headers = { ...(config.headers || {}), 'X-Requested-With': 'XMLHttpRequest' };
+  } catch {}
   return config;
 });
 
-/**
- * Reintento simple para GET idempotentes ante errores de red/5xx (una vez).
- * Evita bucles en POST/PUT/DELETE.
- */
+// 5) Interceptor de response: 401 -> logout; reintento GET 502/503/504 (1 vez)
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const cfg = error.config as AxiosRequestConfig & { __retried?: boolean };
-    const status = error.response?.status;
+  (res) => res,
+  async (error) => {
+    const status = error && error.response && error.response.status;
+    const cfg = error && error.config;
 
-    // 401 → token inválido/expirado: limpia sesión y redirige a login
     if (status === 401) {
-      try {
-        localStorage.removeItem('token');
-      } catch {}
+      try { localStorage.removeItem('token'); } catch {}
       if (typeof window !== 'undefined') window.location.href = '/login';
       return Promise.reject(error);
     }
 
-    // 403 → sin permiso (opcional: redirigir o mostrar toast)
-    if (status === 403) {
-      return Promise.reject(error);
-    }
-
-    // Reintento simple para GET en 502/503/504 o errores de red
-    const shouldRetry =
-      !cfg?.__retried &&
-      cfg?.method?.toLowerCase() === 'get' &&
-      (!status || [502, 503, 504].includes(status));
-
+    const isGet = cfg && cfg.method && cfg.method.toLowerCase() === 'get';
+    const shouldRetry = isGet && !cfg.__retried && (!status || [502, 503, 504].includes(status));
     if (shouldRetry) {
       cfg.__retried = true;
-      await new Promise((r) => setTimeout(r, 600)); // pequeño backoff
+      await new Promise((r) => setTimeout(r, 600));
       return apiClient(cfg);
     }
 
@@ -77,13 +56,5 @@ apiClient.interceptors.response.use(
   }
 );
 
-/** Helpers opcionales para gestionar el token de manera explícita */
-export const setAuthToken = (token: string | null) => {
-  if (typeof window === 'undefined') return;
-  if (token) localStorage.setItem('token', token);
-  else localStorage.removeItem('token');
-};
-
 export const getBaseUrl = () => BASE_URL;
-
 export default apiClient;
