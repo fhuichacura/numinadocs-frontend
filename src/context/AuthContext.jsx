@@ -1,97 +1,48 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import apiClient from '../api/axios';
+// src/context/AuthContext.jsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [briefingData, setBriefingData] = useState({ loading: true, data: [], error: null });
 
-  const fetchBriefingForSession = useCallback(async (authToken) => {
-    if (!authToken) return;
-    setBriefingData(prev => ({ ...prev, loading: true }));
+  // Carga inicial desde localStorage
+  useEffect(() => {
     try {
-      const response = await apiClient.get('/briefing/', {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      setBriefingData({ loading: false, data: response.data, error: null });
-    } catch (error) {
-      console.error("AuthContext: Error al cargar el informe de inteligencia:", error);
-      setBriefingData({ loading: false, data: [], error: error });
-    }
+      const t = localStorage.getItem('token');
+      if (t) setToken(t);
+    } catch {}
+    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    const loadUserAndData = async () => {
-      if (token) {
-        try {
-          const userResponse = await apiClient.get('/users/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setUser(userResponse.data);
-          // Inicia la carga del informe sin bloquear el renderizado
-          fetchBriefingForSession(token);
-        } catch (error) {
-          console.error("Token inválido, cerrando sesión.", error);
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    };
-    loadUserAndData();
-  }, [token, fetchBriefingForSession]);
-
+  // Login contra /auth/login (form-urlencoded: username + password)
   const login = async (email, password) => {
-    const params = new URLSearchParams({ username: email, password });
-    
-    // --- INICIO DE LA CORRECCIÓN CLAVE ---
-    // La petición POST ahora incluye la cabecera 'Content-Type' que el backend necesita.
-    const response = await apiClient.post('/auth/login', params, {
+    const body = new URLSearchParams({ username: email, password });
+    const { data } = await api.post('/auth/login', body.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    // --- FIN DE LA CORRECCIÓN CLAVE ---
-
-    const { access_token } = response.data;
-    localStorage.setItem('token', access_token);
-    setToken(access_token);
+    const t = data?.access_token;
+    if (!t) throw new Error('Token no recibido');
+    localStorage.setItem('token', t);
+    setToken(t);
+    return data;
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    try { localStorage.removeItem('token'); } catch {}
     setToken(null);
-    setUser(null);
+    if (typeof window !== 'undefined') window.location.href = '/login';
   };
-  
-  const refreshUser = useCallback(async () => {
-    if (token) {
-      try {
-        const userResponse = await apiClient.get('/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(userResponse.data);
-      } catch (error) {
-        console.error("No se pudo refrescar el usuario, cerrando sesión.", error);
-        logout();
-      }
-    }
-  }, [token]);
 
-  const value = { token, user, loading, login, logout, refreshUser, briefingData, fetchBriefingForSession };
+  const value = useMemo(() => ({ token, login, logout, loading }), [token, loading]);
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
-};
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth debe usarse dentro de <AuthProvider>');
+  return ctx;
+}

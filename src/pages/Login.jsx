@@ -1,9 +1,10 @@
+// src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('felipe@numinadocs.com');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -13,11 +14,12 @@ const Login = () => {
     e.preventDefault();
     setError('');
     try {
-      await login(email, password);
+      await login(email, password);      // form-urlencoded bajo el capó
       navigate('/dashboard');
     } catch (err) {
       console.error('Error en el login:', err);
-      setError('El email o la contraseña son incorrectos.');
+      const status = err?.response?.status;
+      setError(status === 401 ? 'Email o contraseña incorrectos.' : 'No fue posible iniciar sesión.');
     }
   };
 

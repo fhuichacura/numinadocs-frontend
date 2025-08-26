@@ -1,17 +1,16 @@
 // src/api/axios.js
 import axios from 'axios';
 
-// 1) Origen base (Vite -> VITE_API_URL; fallback origin; luego localhost)
+// Origen base de la API: Vite -> VITE_API_URL; si no, origin; si no, localhost
 const rawApiOrigin =
   (import.meta && import.meta.env && import.meta.env.VITE_API_URL) ||
   (typeof window !== 'undefined' ? window.location.origin : '') ||
   'https://api-nd.n100f.com';
 
-// 2) Normaliza y asegura sufijo /api/v1
+// Normaliza y asegura /api/v1
 const normalize = (s) => (s ? s.replace(/\/+$/, '') : '');
 const BASE_URL = `${normalize(rawApiOrigin)}/api/v1`;
 
-// 3) Cliente axios
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
@@ -19,7 +18,7 @@ const apiClient = axios.create({
   withCredentials: false,
 });
 
-// 4) Interceptor de request: añade token si existe
+// Adjunta Authorization si hay token
 apiClient.interceptors.request.use((config) => {
   try {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -31,12 +30,12 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// 5) Interceptor de response: 401 -> logout; reintento GET 502/503/504 (1 vez)
+// Manejo 401 + reintento simple GET en 502/503/504
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const status = error && error.response && error.response.status;
-    const cfg = error && error.config;
+    const status = error?.response?.status;
+    const cfg = error?.config;
 
     if (status === 401) {
       try { localStorage.removeItem('token'); } catch {}
@@ -44,14 +43,13 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const isGet = cfg && cfg.method && cfg.method.toLowerCase() === 'get';
-    const shouldRetry = isGet && !cfg.__retried && (!status || [502, 503, 504].includes(status));
-    if (shouldRetry) {
+    const isGet = cfg?.method?.toLowerCase() === 'get';
+    const retriable = isGet && !cfg.__retried && (!status || [502, 503, 504].includes(status));
+    if (retriable) {
       cfg.__retried = true;
       await new Promise((r) => setTimeout(r, 600));
       return apiClient(cfg);
     }
-
     return Promise.reject(error);
   }
 );
