@@ -1,53 +1,104 @@
+// src/components/ProjectTable.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const ProjectTable = ({ projects, loading }) => {
+function formatDate(value) {
+  try {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('es-ES', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(d);
+  } catch {
+    return '—';
+  }
+}
+
+/**
+ * ProjectTable
+ * Props:
+ *  - projects: array de objetos (id, name, owner, status, updated_at...)
+ *  - loading: bool
+ */
+export default function ProjectTable({ projects = [], loading = false }) {
+  // filas de loading (no usan texto suelto)
+  const skeletonRows = Array.from({ length: 5 }).map((_, i) => (
+    <tr key={`sk-${i}`}>
+      <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-700/50 rounded" /></td>
+      <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-700/50 rounded" /></td>
+      <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-700/50 rounded" /></td>
+      <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-700/50 rounded" /></td>
+      <td className="px-4 py-3 text-right"><div className="h-8 w-24 bg-gray-700/50 rounded" /></td>
+    </tr>
+  ));
+
+  const rows = !loading
+    ? projects.map((p) => {
+        const id = p.id ?? p.project_id;
+        const name = p.name ?? p.project_name ?? 'Proyecto';
+        const owner = p.owner ?? p.owner_name ?? '—';
+        const status = (p.status ?? 'N/A').toString();
+        const updated = p.updated_at ?? p.last_updated;
+
+        const statusClass =
+          status.toLowerCase() === 'active'
+            ? 'bg-green-500/20 text-green-300'
+            : status.toLowerCase() === 'paused'
+            ? 'bg-yellow-500/20 text-yellow-300'
+            : 'bg-gray-500/20 text-gray-300';
+
+        return (
+          <tr key={id ?? name}>
+            <td className="px-4 py-3 text-white font-medium">
+              <Link
+                to={`/projects/${id ?? ''}`}
+                className="hover:underline"
+              >
+                {name}
+              </Link>
+            </td>
+            <td className="px-4 py-3 text-gray-300">{owner}</td>
+            <td className="px-4 py-3">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${statusClass}`}>
+                {status}
+              </span>
+            </td>
+            <td className="px-4 py-3 text-gray-300">{formatDate(updated)}</td>
+            <td className="px-4 py-3 text-right">
+              <Link
+                to={`/projects/${id ?? ''}`}
+                className="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-sm"
+              >
+                Abrir
+              </Link>
+            </td>
+          </tr>
+        );
+      })
+    : skeletonRows;
+
   return (
-    // El contenedor principal ahora es flexible en altura
-    <div className="bg-gray-800 rounded-lg p-6 flex flex-col h-full">
-      <h2 className="text-xl font-semibold text-white mb-4">Proyectos</h2>
-      
-      {/* Contenedor de la tabla con altura máxima y scroll */}
-      <div className="flex-grow overflow-y-auto -mx-6 px-6">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-gray-700 text-sm text-gray-400">
-              <th className="p-3">Nombre del Proyecto</th>
-              <th className="p-3">Estado</th>
-              <th className="p-3">Documentos</th>
-              <th className="p-3">Última Actividad</th>
+    <div className="bg-gray-900/60 border border-gray-800 rounded-xl">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-800/60 text-gray-300">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">Proyecto</th>
+              <th className="px-4 py-3 text-left font-semibold">Owner</th>
+              <th className="px-4 py-3 text-left font-semibold">Estado</th>
+              <th className="px-4 py-3 text-left font-semibold">Actualizado</th>
+              <th className="px-4 py-3 text-right font-semibold">Acciones</th>
             </tr>
           </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="4" className="p-3 text-center text-gray-400">Cargando proyectos...</td>
-              </tr>
-            ) : projects.length > 0 ? (
-              projects.map(project => (
-                <tr key={project.id} className="border-b border-gray-700 last:border-none hover:bg-gray-700">
-                  <td className="p-3 font-semibold">
-                    <Link to={`/projects/${project.id}`} className="text-purple-400 hover:text-purple-300">
-                      {project.name}
-                    </Link>
-                  </td>
-                  <td className="p-3">
-                    <span className="bg-green-500/20 text-green-300 text-xs px-2 py-1 rounded-full">Activo</span>
-                  </td>
-                  <td className="p-3">5</td> {/* Placeholder */}
-                  <td className="p-3">Hace 2 horas</td> {/* Placeholder */}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="p-3 text-center text-gray-500">No hay proyectos creados.</td>
-              </tr>
-            )}
-          </tbody>
+          <tbody>{rows}</tbody>
         </table>
       </div>
+
+      {!loading && projects.length === 0 ? (
+        <div className="p-6 text-gray-400">No hay proyectos todavía.</div>
+      ) : null}
     </div>
   );
-};
-
-export default ProjectTable;
+}
