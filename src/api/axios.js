@@ -1,8 +1,17 @@
+// src/api/axios.js
 import axios from 'axios';
 
 function getApiOrigin() {
-  try { if (import.meta && import.meta.env && import.meta.env.VITE_API_URL) return String(import.meta.env.VITE_API_URL); } catch {}
-  try { if (typeof window !== 'undefined' && window.location && window.location.origin) return window.location.origin; } catch {}
+  try {
+    if (import.meta && import.meta.env && import.meta.env.VITE_API_URL) {
+      return String(import.meta.env.VITE_API_URL);
+    }
+  } catch (e) {}
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return window.location.origin;
+    }
+  } catch (e) {}
   return 'http://localhost:8006';
 }
 function trimRightSlashes(s){ return s ? s.replace(/\/+$/, '') : ''; }
@@ -27,10 +36,16 @@ api.interceptors.request.use(function (config) {
 api.interceptors.response.use(
   (r) => r,
   async (err) => {
-    var st = err?.response?.status; var cfg = err?.config;
-    if (st === 401) { try { localStorage.removeItem('token'); } catch {}; if (typeof window !== 'undefined') window.location.href = '/login'; return Promise.reject(err); }
-    var isGet = cfg?.method?.toLowerCase() === 'get';
-    var retry = isGet && !cfg.__retried && (!st || [502,503,504].includes(st));
+    var st = err && err.response ? err.response.status : undefined;
+    var cfg = err ? err.config : undefined;
+
+    if (st === 401) {
+      try { localStorage.removeItem('token'); } catch {}
+      if (typeof window !== 'undefined') window.location.href = '/login';
+      return Promise.reject(err);
+    }
+    var isGet = cfg && cfg.method ? String(cfg.method).toLowerCase()==='get' : false;
+    var retry = isGet && !cfg.__retried && (!st || st===502 || st===503 || st===504);
     if (retry) { cfg.__retried = true; await new Promise(r=>setTimeout(r,600)); return api(cfg); }
     return Promise.reject(err);
   }

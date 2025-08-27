@@ -1,7 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
-import { parseJwt } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
@@ -10,44 +9,44 @@ export function AuthProvider({ children }) {
   const [user, setUser]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(function () {
+  // Carga inicial
+  useEffect(() => {
     try {
-      var t = localStorage.getItem('token');
+      const t = localStorage.getItem('token');
       if (t) {
         setToken(t);
-        var decoded = parseJwt(t);
-        setUser(decoded ? { email: decoded.sub } : null);
+        // decode básico del sub (si ocupa)
+        const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+        setUser(payload?.sub ? { email: payload.sub } : null);
       }
-    } catch (e) {}
+    } catch {}
     setLoading(false);
   }, []);
 
-  // /auth/login espera x-www-form-urlencoded: username + password
-  const login = async function (email, password) {
-    var body = new URLSearchParams({ username: email, password: password });
-    var res  = await api.post('/auth/login', body.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  const login = async (email, password) => {
+    const body = new URLSearchParams({ username: email, password });
+    const { data } = await api.post('/auth/login', body.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 20000,
     });
-    var t = res && res.data ? res.data.access_token : null;
+    const t = data?.access_token;
     if (!t) throw new Error('Token no recibido');
     localStorage.setItem('token', t);
     setToken(t);
-    var decoded = parseJwt(t);
-    setUser(decoded ? { email: decoded.sub } : null);
-    return res.data;
+    try {
+      const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      setUser(payload?.sub ? { email: payload.sub } : null);
+    } catch { setUser(null); }
+    return data;
   };
 
-  const logout = function () {
-    try { localStorage.removeItem('token'); } catch (e) {}
-    setUser(null);
-    setToken(null);
+  const logout = () => {
+    try { localStorage.removeItem('token'); } catch {}
+    setUser(null); setToken(null);
     if (typeof window !== 'undefined') window.location.href = '/login';
   };
 
-  const value = useMemo(function () {
-    return { token: token, user: user, login: login, logout: logout, loading: loading };
-  }, [token, user, loading]);
-
+  const value = useMemo(() => ({ token, user, login, logout, loading }), [token, user, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
