@@ -25,28 +25,35 @@ const api = axios.create({
   withCredentials: false
 });
 
+// ---- Token ----
 api.interceptors.request.use(function (config) {
   try {
-    var t = (typeof window !== 'undefined') ? localStorage.getItem('token') : null;
+    const t = (typeof window !== 'undefined') ? localStorage.getItem('token') : null;
     if (t) config.headers = Object.assign({}, config.headers, { Authorization: 'Bearer ' + t });
   } catch {}
   return config;
 });
 
+// ---- Respuesta / Retry / 401 ----
 api.interceptors.response.use(
   (r) => r,
   async (err) => {
-    var st = err && err.response ? err.response.status : undefined;
-    var cfg = err ? err.config : undefined;
+    const st  = err && err.response ? err.response.status : undefined;
+    const cfg = err ? err.config : undefined;
 
     if (st === 401) {
       try { localStorage.removeItem('token'); } catch {}
       if (typeof window !== 'undefined') window.location.href = '/login';
       return Promise.reject(err);
     }
-    var isGet = cfg && cfg.method ? String(cfg.method).toLowerCase()==='get' : false;
-    var retry = isGet && !cfg.__retried && (!st || st===502 || st===503 || st===504);
-    if (retry) { cfg.__retried = true; await new Promise(r=>setTimeout(r,600)); return api(cfg); }
+
+    const isGet = cfg && cfg.method ? String(cfg.method).toLowerCase()==='get' : false;
+    const retry = isGet && !cfg.__retried && (!st || st===502 || st===503 || st===504);
+    if (retry) {
+      cfg.__retried = true;
+      await new Promise(r=>setTimeout(r, 600));
+      return api(cfg);
+    }
     return Promise.reject(err);
   }
 );
